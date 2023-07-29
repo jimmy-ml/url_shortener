@@ -1,0 +1,347 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+
+Description: >
+            Meli - Reto URL Shortener |
+            Stack Name: meli-marketing-url-shortener
+
+Globals:
+  Function:
+    Timeout: 30
+  Api:
+    EndpointConfiguration: REGIONAL
+    Cors: "'*'"
+
+Parameters:
+  Env:
+    Type: String
+    Description: Enviroment to Deploy
+  ApiVersion:
+    Type: String
+    Description: Version to the API
+    Default: "1"
+
+Resources:
+  ##############
+  #   BUCKET   #
+  ##############
+  S3:
+    Type: AWS::S3::Bucket
+    # DeletionPolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      WebsiteConfiguration:
+        IndexDocument: index.html
+      NotificationConfiguration: # circular dependency # TODO cloudtrail
+        LambdaConfigurations:
+          - Event: 's3:ObjectCreated:Put'
+            Function: !GetAtt FunctionPutItemDynamo.Arn
+
+  S3Policy:
+    Type: AWS::S3::BucketPolicy
+    Properties: 
+      Bucket: !Ref S3
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 's3:GetObject'
+            Effect: Allow
+            Principal: '*'
+            Resource: !Sub "${S3.Arn}/*"
+            Condition:
+              StringEquals:
+                'aws:UserAgent': '.XkSC7a)H(J2B7^BD7H722Wxl:{SeF' # TODO
+
+  ##############
+  #  DynamoDB  #
+  ##############
+  UrlShortenerTable:
+    Type: AWS::DynamoDB::Table
+    # DeletionPolicy: Retain
+    Properties: 
+      AttributeDefinitions: 
+        - 
+          AttributeName: "url_key"
+          AttributeType: "S"
+        -
+          AttributeName: "target_url"
+          AttributeType: "S"
+      KeySchema: 
+        - 
+          AttributeName: "url_key"
+          KeyType: "HASH"
+      ProvisionedThroughput: 
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      GlobalSecondaryIndexes:
+        - IndexName: target_url_index
+          KeySchema: 
+          - 
+            AttributeName: "target_url"
+            KeyType: "HASH"
+          - 
+            AttributeName: "url_key"
+            KeyType: "RANGE"
+          Projection: 
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+
+  ##############
+  #     API    #
+  ##############
+  API:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub ${AWS::StackName}
+      TracingEnabled: True
+      EndpointConfiguration: REGIONAL
+      Cors:
+        AllowHeaders: "'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Api-Key'"
+        AllowOrigin: "'*'"
+      # Auth:
+#        DefaultAuthorizer: CognitoAuthorizer
+        # Authorizers:
+        #   CognitoAuthorizer:
+        #     UserPoolArn:
+        #       Fn::ImportValue:
+        #         !Sub "ncloud-mvp-${Env}-cognito-CognitoUserPoolARN-${Env}"
+        #     Identity:
+        #       Header: Authorization
+      StageName: !Sub v${ApiVersion}
+
+  # APIBase:
+  #   Type: AWS::ApiGateway::BasePathMapping
+  #   Properties:
+  #     RestApiId: !Ref API
+  #     BasePath: v2
+  #     DomainName: !Ref DomainName
+  #     Stage: !Ref API.Stage
+
+  ################
+  #  CloudFront  #
+  ################
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    DependsOn: S3
+    Properties:
+      DistributionConfig:
+        Origins:
+          - DomainName: !Select [2, !Split ["/", !GetAtt S3.WebsiteURL]]
+            ConnectionAttempts: 3
+            ConnectionTimeout: 10
+            Id: !GetAtt S3.WebsiteURL
+            CustomOriginConfig:
+              HTTPPort: 80
+              OriginProtocolPolicy: http-only
+              OriginSSLProtocols:
+                - TLSv1.2
+            OriginCustomHeaders:
+              - HeaderName: User-Agent
+                HeaderValue: '.XkSC7a)H(J2B7^BD7H722Wxl:{SeF' # TODO
+            OriginShield:
+              Enabled: true
+              OriginShieldRegion: !Sub ${AWS::Region}
+        DefaultCacheBehavior:
+          Compress: true
+          TargetOriginId: !GetAtt S3.WebsiteURL
+          ViewerProtocolPolicy: 'redirect-to-https'
+          CachePolicyId: '658327ea-f89d-4fab-a63d-7e88639e58f6'
+        Enabled: true
+        HttpVersion: 'http2'
+        IPV6Enabled: false
+        PriceClass: 'PriceClass_All'
+
+  #################
+  #  API LAMBDAS  #
+  #################
+  FunctionApiGetAllUrl:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: GET all registries from DynamoDB
+      CodeUri: lambdas/api_get/
+      Handler: get_all.lambda_handler
+      Runtime: python3.9
+      Role: !GetAtt LambdaRole.Arn
+      # Environment:
+      #   Variables:
+      #     # DYNAMO_TABLE: !Ref UrlShortenerTable
+      #     DYNAMO_TABLE: meli-marketing-url-shortener-UrlShortenerTable-10ETGIFQ2NNY3
+      Events:
+        Get:
+          Type: Api
+          Properties:
+            RestApiId: !Ref API
+            Path: /url
+            Method: GET
+            # RequestParameters:
+            # - method.request.querystring.keyword:
+            #     Required: true
+            #     Caching: false
+            # Auth:
+            #   Authorizer: CognitoAuthorizer
+
+  FunctionApiGetUrl:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: GET registries from DynamoDB
+      CodeUri: lambdas/api_get/
+      Handler: get.lambda_handler
+      Runtime: python3.9
+      Role: !GetAtt LambdaRole.Arn
+      # Environment:
+      #   Variables:
+      #     # DYNAMO_TABLE: !Ref UrlShortenerTable
+      #     DYNAMO_TABLE: meli-marketing-url-shortener-UrlShortenerTable-10ETGIFQ2NNY3
+      Events:
+        Get:
+          Type: Api
+          Properties:
+            RestApiId: !Ref API
+            Path: /url/{url_key}
+            Method: GET
+            # Auth:
+            #   Authorizer: CognitoAuthorizer
+
+  # AWS Lambda function for starts and stops EC2 intances
+  FunctionApiPostUrl:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: POST short url to S3
+      CodeUri: lambdas/api_post/
+      Handler: post.lambda_handler
+      Runtime: python3.9
+      Role: !GetAtt LambdaRole.Arn
+      # Environment:
+      #   Variables:
+          # DYNAMO_TABLE: !Ref UrlShortenerTable
+          # DYNAMO_TABLE: meli-marketing-url-shortener-UrlShortenerTable-10ETGIFQ2NNY3
+      Events:
+        Post:
+          Type: Api
+          Properties:
+            RestApiId: !Ref API
+            Path: /url
+            Method: POST
+            # Auth:
+            #   Authorizer: CognitoAuthorizer
+
+  #############
+  #  LAMBDAS  #
+  #############
+  FunctionPutItemDynamo:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: POST to DynamoDB
+      CodeUri: lambdas/
+      Handler: post_dynamo.lambda_handler
+      Runtime: python3.9
+      Role: !GetAtt LambdaRole.Arn # circular dependency
+
+  # EvetPOSTDynamo:
+  #   Type: AWS::Events::Rule
+  #   Properties:
+  #     Description: "Create item with a new item in S3"
+  #     RoleArn: !GetAtt  CWEventRoleLambdaInvocation.Arn
+  #     State: ENABLED
+  #     EventPattern:
+  #       source: ["aws.s3"]
+  #       detail-type: ["Object Created"]
+  #       detail:
+  #         bucket:
+  #           name:
+  #             - !Ref S3
+  #     Targets:
+  #       - 
+  #         Arn: !GetAtt FunctionPutItemDynamo.Arn
+  #         Id: FunctionPutItemDynamo
+
+  # LambdaPermissionEvetPOSTDynamo:
+  #   Type: AWS::Lambda::Permission
+  #   Properties:
+  #     FunctionName: !Ref FunctionPutItemDynamo
+  #     Action: "lambda:InvokeFunction"
+  #     Principal: "events.amazonaws.com"
+  #     SourceArn: !GetAtt EvetPOSTDynamo.Arn
+
+
+
+  ##################
+  #       IAM      #
+  ##################
+  # IAM role for basic Lambda execution and EC2 start and stop instances
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+                - "edgelambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  LambdaRolePolicyDynamoDB:
+    Type: AWS::IAM::RolePolicy
+    Properties: 
+      PolicyName: DynamoDB
+      RoleName: !Ref LambdaRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "dynamodb:GetItem"
+              - "dynamodb:PutItem"
+              - "dynamodb:UpdateItem"
+              - "dynamodb:DeleteItem"
+              - "dynamodb:Query"
+              - "dynamodb:Scan"
+            Resource:
+              - !GetAtt UrlShortenerTable.Arn
+              - !Sub "${UrlShortenerTable.Arn}/*"
+                
+  LambdaRolePolicyS3:
+    Type: AWS::IAM::RolePolicy
+    Properties: 
+      PolicyName: S3
+      RoleName: !Ref LambdaRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "s3:GetObject"
+              - "s3:PutObject"
+              - "s3:DeleteObject"
+            Resource:
+              - !Sub "${S3.Arn}/*"
+
+  # ##################
+  # # SSM Parameters #
+  # ##################
+  # ParameterFunctionStartStopInstance:
+  #   Type: AWS::SSM::Parameter
+  #   Properties: 
+  #     Description: Lambda function that Start or Stop EC2 instances
+  #     Name: /sam-maintenance-tools/lambda/start-stop-instance/arn
+  #     Tier: Standard
+  #     Type: String
+  #     Value: !GetAtt FunctionStartStopInstance.Arn
+
+Outputs:
+  APIUrl:
+    Value: !Sub https://${API}.execute-api.${AWS::Region}.amazonaws.com/v1/

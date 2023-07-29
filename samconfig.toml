@@ -1,0 +1,26 @@
+version = 0.1
+[dev]
+[dev.deploy]
+[dev.deploy.parameters]
+stack_name = "meli-marketing-url-shortener"
+template_file = "sam-template.yml"
+s3_bucket = "meli-marketing-jml-challenge-virginia"
+s3_prefix = "url-shortener/1.0.0"
+region = "us-east-1"
+parameter_overrides = "Env=\"dev\""
+confirm_changeset = false
+capabilities = "CAPABILITY_NAMED_IAM"
+no_fail_on_empty_changeset = true
+
+[prd]
+[prd.deploy]
+[prd.deploy.parameters]
+stack_name = "meli-marketing-url-shortener"
+template_file = "sam-template.yml"
+s3_bucket = "meli-marketing-jml-challenge-virginia"
+s3_prefix = "url-shortener/1.0.0"
+region = "us-east-1"
+parameter_overrides = "Env=\"prd\""
+confirm_changeset = false
+capabilities = "CAPABILITY_NAMED_IAM"
+no_fail_on_empty_changeset = true
