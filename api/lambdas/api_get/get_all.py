@@ -26,15 +26,21 @@ def lambda_handler(event, context):
     """
     # Log the received event
     print("Received event: " + json.dumps(event, indent=2))
-    dynamo_table = 'meli-marketing-url-shortener-UrlShortenerTable-8HFRS6FOL2X5' # TODO
-    global_index_name = 'target_url_index' # TODO
 
+    # params
+    dynamo_table = os.environ["DYNAMO_TABLE"]
+    global_index_name = os.environ["GLOBAL_INDEX"]
+
+    # aws sdk for dynamo
     dynamo_resouce = boto3.resource('dynamodb')
     table = dynamo_resouce.Table(dynamo_table)
 
+    # get info if target_url exists or not in queryStringParameters
     query_params = event['queryStringParameters']
     if query_params == None:
-        response = table.scan()
+        response = table.scan(
+            FilterExpression=Key('is_active').eq(True)
+        )
     else:
         if 'target_url' in query_params:
             target_url = query_params['target_url']
@@ -44,6 +50,7 @@ def lambda_handler(event, context):
                 FilterExpression=Key('is_active').eq(True)
             )
 
+    # transform response to json valid
     response_body = [item_transform(dynamo_item)
                      for dynamo_item in response['Items']]
 

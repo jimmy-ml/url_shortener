@@ -1,4 +1,5 @@
 import json
+import os
 import boto3
 import secrets
 
@@ -13,7 +14,7 @@ def build_response(code, message):
         'body': message
     }
 
-def put_short_url_s3(s3_bucket, s3_key, target_url):
+def put_url_key_s3(s3_bucket, s3_key, target_url):
     s3_client.put_object(
         Bucket=s3_bucket,
         Key=s3_key,
@@ -27,17 +28,21 @@ def lambda_handler(event, context):
     # Log the received event
     print("Received event: " + json.dumps(event, indent=2))
 
+    # params
     body = event.get("body")
     try:
         body = json.loads(body)
     except Exception:
         print("Se usa body original")
+    bucket_name = os.environ["BUCKET_NAME"]
 
-    bucket_name = 'meli-marketing-url-shortener-s3-pbhu6yo6jq94'
+    # random string that’ll be part of the shortened URL
     chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-    key = "".join(secrets.choice(chars) for _ in range(6)) # random string that’ll be part of the shortened URL
+    key = "".join(secrets.choice(chars) for _ in range(6))
 
-    put_short_url_s3(bucket_name, key, body["target_url"])
+    # put object in bucket
+    put_url_key_s3(bucket_name, key, body["target_url"])
+
     response_body = {
         "target_url": body["target_url"],
         "url_key": key

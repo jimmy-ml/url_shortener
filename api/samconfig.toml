@@ -1,0 +1,19 @@
+version = 0.1
+[dev]
+[dev.deploy]
+[dev.deploy.parameters]
+stack_name = "meli-mrkt-url-shortener-api"
+template_file = "sam-template.yml"
+s3_bucket = "administration-816722599048"
+s3_prefix = "sam/meli-mrkt-url-shortener-api/1.0.0"
+region = "us-east-1"
+confirm_changeset = false
+capabilities = "CAPABILITY_NAMED_IAM"
+no_fail_on_empty_changeset = true
+tags = """
+  project_name="UrlShortener"
+  environment="dev"
+  iac = "terraform"
+  leader = "jimmy.matlag@gmail.com"
+  company_name = "meli"
+"""

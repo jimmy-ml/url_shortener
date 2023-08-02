@@ -1,0 +1,288 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+
+Description: >
+            Meli - URL Shortener |
+            Stack Name: meli-marketing-url-shortener-api
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: python3.10
+  Api:
+    EndpointConfiguration: EDGE
+    Cors: "'*'"
+
+Parameters:
+  ##############
+  #     API    #
+  ##############
+  ApiVersion:
+    Type: String
+    Description: Version to the API
+    Default: "1"
+  ##############
+  #   DOMAIN   #
+  ##############
+  DomainName:
+    Type: AWS::SSM::Parameter::Value<String>
+    Description: "Name of the domain for URL shortener (do not modify)"
+    Default: /meli/url-shortener/domain_main/name
+  R53HostedZoneId:
+    Type: AWS::SSM::Parameter::Value<String>
+    Description: "Zone ID of the domain for URL shortener (do not modify)"
+    Default: /meli/url-shortener/domain_main/zone_id
+  ACMCertificateApiArn:
+    Type: AWS::SSM::Parameter::Value<String>
+    Description: "ARN of the ACM Certificate for API URL shortener (do not modify)"
+    Default: /meli/url-shortener/acm_certificate_api/arn
+
+  ##############
+  #    CORE    #
+  ##############
+  S3BucketShortKeyName:
+    Type: AWS::SSM::Parameter::Value<String>
+    Description: "Bucket name for URL shortener (do not modify)"
+    Default: /meli/url-shortener/bucket-short-key/name
+  S3BucketShortKeyArn:
+    Type: AWS::SSM::Parameter::Value<String>
+    Description: "Bucket ARN for URL shortener (do not modify)"
+    Default: /meli/url-shortener/bucket-short-key/arn
+  S3BucketShortKeyLogsArn:
+    Type: AWS::SSM::Parameter::Value<String>
+    Description: "Bucket ARN for Cloudfront Logs of URL shortener (do not modify)"
+    Default: /meli/url-shortener/bucket-short-key-cloudfront-logs/arn
+  DynamoTableShortKeyName:
+    Type: AWS::SSM::Parameter::Value<String>
+    Description: "DynamoDB table name for URL shortener (do not modify)"
+    Default: /meli/url-shortener/dynamo-short-key/name
+  DynamoTableShortKeyArn:
+    Type: AWS::SSM::Parameter::Value<String>
+    Description: "DynamoDB table ARN for URL shortener (do not modify)"
+    Default: /meli/url-shortener/dynamo-short-key/arn
+  DynamoTableShortKeyGlobalIndexName:
+    Type: AWS::SSM::Parameter::Value<String>
+    Description: "Global Secondary Index name for URL shortener (do not modify)"
+    Default: /meli/url-shortener/dynamo-short-key/global-index/name
+
+Resources:
+  ##############
+  #     API    #
+  ##############
+  API:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub ${AWS::StackName}
+      Description: "API for Shortener URL"
+      TracingEnabled: True
+      Cors:
+        AllowHeaders: "'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Api-Key'"
+        AllowOrigin: "'*'"
+      StageName: !Sub v${ApiVersion}
+      Domain:
+        DomainName: !Sub "api.${DomainName}"
+        CertificateArn: !Ref ACMCertificateApiArn
+        EndpointConfiguration: EDGE
+        Route53:
+          HostedZoneId: !Ref R53HostedZoneId
+          EvaluateTargetHealth: true
+
+  #################
+  #  API LAMBDAS  #
+  #################
+  FunctionApiGetAllUrl:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: GET all registries from DynamoDB
+      CodeUri: lambdas/api_get/
+      Handler: get_all.lambda_handler
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          DYNAMO_TABLE: !Ref DynamoTableShortKeyName
+          GLOBAL_INDEX: !Ref DynamoTableShortKeyGlobalIndexName
+      Events:
+        Get:
+          Type: Api
+          Properties:
+            RestApiId: !Ref API
+            Path: /url
+            Method: GET
+
+  FunctionApiGetUrl:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: GET specific registry from DynamoDB
+      CodeUri: lambdas/api_get/
+      Handler: get.lambda_handler
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          DYNAMO_TABLE: !Ref DynamoTableShortKeyName
+      Events:
+        Get:
+          Type: Api
+          Properties:
+            RestApiId: !Ref API
+            Path: /url/{url_key}
+            Method: GET
+
+  FunctionApiPostUrl:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: POST (create) url_key object to S3 bucket
+      CodeUri: lambdas/api_post/
+      Handler: post.lambda_handler
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref S3BucketShortKeyName
+      Events:
+        Post:
+          Type: Api
+          Properties:
+            RestApiId: !Ref API
+            Path: /url
+            Method: POST
+
+  FunctionApiDeleteUrl:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: DELETE url_key object in S3 bucket
+      CodeUri: lambdas/api_delete/
+      Handler: delete.lambda_handler
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref S3BucketShortKeyName
+      Events:
+        Post:
+          Type: Api
+          Properties:
+            RestApiId: !Ref API
+            Path: /url/{url_key}
+            Method: DELETE
+
+  ####################
+  #  EVENTS LAMBDAS  #
+  ####################
+  FunctionEventPutItemDynamo:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: "PUT item to DynamoDB. Trigger by an ObjectCreated:Put action in bucket short_key"
+      CodeUri: lambdas/event_put
+      Handler: put_dynamo.lambda_handler
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          DYNAMO_TABLE: !Ref DynamoTableShortKeyName
+
+  FunctionEventDeleteItemDynamo:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: "DELETE item in DynamoDB. Trigger by an ObjectRemoved:Delete action in bucket short_key"
+      CodeUri: lambdas/event_delete
+      Handler: delete_dynamo.lambda_handler
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          DYNAMO_TABLE: !Ref DynamoTableShortKeyName
+
+  FunctionEventCloudfrontLogs:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: "Read Cloudfront logs from S3. Trigger by an ObjectCreated:Put action in bucket short_key"
+      CodeUri: lambdas/event_cloudfront_log
+      Handler: read_logs.lambda_handler
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          DYNAMO_TABLE: !Ref DynamoTableShortKeyName
+
+  ##################
+  #       IAM      #
+  ##################
+  # IAM role for basic Lambda execution
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  LambdaRolePolicyDynamoDB:
+    Type: AWS::IAM::RolePolicy
+    Properties: 
+      PolicyName: DynamoDB
+      RoleName: !Ref LambdaRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "dynamodb:GetItem"
+              - "dynamodb:PutItem"
+              - "dynamodb:UpdateItem"
+              - "dynamodb:DeleteItem"
+              - "dynamodb:Query"
+              - "dynamodb:Scan"
+            Resource:
+              - !Ref DynamoTableShortKeyArn
+              - !Sub "${DynamoTableShortKeyArn}/*"
+                
+  LambdaRolePolicyS3:
+    Type: AWS::IAM::RolePolicy
+    Properties: 
+      PolicyName: S3
+      RoleName: !Ref LambdaRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "s3:GetObject"
+              - "s3:PutObject"
+              - "s3:DeleteObject"
+            Resource:
+              - !Sub "${S3BucketShortKeyArn}/*"
+              - !Sub "${S3BucketShortKeyLogsArn}/*"
+
+  ##################
+  # SSM Parameters #
+  ##################
+  ParameterFunctionEventPutItemDynamo:
+    Type: AWS::SSM::Parameter
+    Properties: 
+      Description: Lambda function that PUTs items in DynamoDB when S3 event occurs
+      Name: /meli/url-shortener/sam-api/lambda/put-item-dynamo/arn
+      Tier: Standard
+      Type: String
+      Value: !GetAtt FunctionEventPutItemDynamo.Arn
+
+  ParameterFunctionEventDeleteItemDynamo:
+    Type: AWS::SSM::Parameter
+    Properties: 
+      Description: Lambda function that DELETEs items in DynamoDB when S3 event occurs
+      Name: /meli/url-shortener/sam-api/lambda/delete-item-dynamo/arn
+      Tier: Standard
+      Type: String
+      Value: !GetAtt FunctionEventDeleteItemDynamo.Arn
+
+  ParameterFunctionEventCloudfrontLogs:
+    Type: AWS::SSM::Parameter
+    Properties: 
+      Description: Lambda function that UPDATEs items in DynamoDB when S3 event occurs
+      Name: /meli/url-shortener/sam-api/lambda/read-cloudfront-logs/arn
+      Tier: Standard
+      Type: String
+      Value: !GetAtt FunctionEventCloudfrontLogs.Arn

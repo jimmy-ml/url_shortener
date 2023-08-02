@@ -24,20 +24,24 @@ def lambda_handler(event, context):
     Principal Lambda Handler
     """
     # Log the received event
-    # print("Received event: " + json.dumps(event, indent=2))
-    dynamo_table = 'meli-marketing-url-shortener-UrlShortenerTable-8HFRS6FOL2X5' # TODO
+    print("Received event: " + json.dumps(event, indent=2))
 
+    # params
+    dynamo_table = os.environ["DYNAMO_TABLE"]
     path_parameters = event.get('pathParameters')
     url_key = path_parameters['url_key']
-    print(url_key)
 
+    # aws sdk for dynamo
     dynamo_resouce = boto3.resource('dynamodb')
     table = dynamo_resouce.Table(dynamo_table)
 
+    # get item from dynamo
     response = table.query(
         KeyConditionExpression=Key('url_key').eq(url_key),
         FilterExpression=Key('is_active').eq(True)
     )
+
+    # transform response to json valid
     dynamo_item = item_transform(response['Items'][0])
 
     return build_response(200, json.dumps(dynamo_item))
