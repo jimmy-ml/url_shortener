@@ -1,8 +1,8 @@
 openapi: 3.0.0
 info:
   version: 1.0.0
-  title: API de acortamiento de URLs
-  description: Documentación de la API de acortamiento de URLs
+  title: URL Shortener API
+  description: Documentation for the URL shortener API
 
 servers:
   - url: https://api.jml.lat
@@ -10,21 +10,21 @@ servers:
 paths:
   /url:
     get:
-      summary: Obtener todas las URLs acortadas
-      description: Obtiene una lista de todas las URLs acortadas registradas.
+      summary: Get all shortened URLs
+      description: Retrieves a list of all registered shortened URLs.
       responses:
         '200':
-          description: Lista de URLs acortadas.
+          description: List of shortened URLs.
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  type: string
+                  $ref: '#/components/schemas/ShortenedURL'
 
     post:
-      summary: Crear una nueva URL acortada
-      description: Crea una nueva URL acortada a partir de una URL larga proporcionada.
+      summary: Create a new shortened URL
+      description: Creates a new shortened URL from the provided long URL.
       requestBody:
         required: true
         content:
@@ -32,56 +32,83 @@ paths:
             schema:
               type: object
               properties:
-                long_url:
+                target_url:
                   type: string
                   format: uri
+                  description: The original long URL that will be shortened.
               required:
-                - long_url
+                - target_url
       responses:
         '201':
-          description: URL acortada creada correctamente.
+          description: Shortened URL successfully created.
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  short_url:
+                  target_url:
                     type: string
+                    format: uri
+                    description: The original long URL that was shortened.
+                  url_key:
+                    type: string
+                    description: The unique key associated with the shortened URL.
 
   /url/{short_url}:
     get:
-      summary: Obtener información de una URL acortada
-      description: Obtiene información sobre la URL acortada correspondiente al short_url proporcionado.
+      summary: Get information about a shortened URL
+      description: Retrieves information about the shortened URL corresponding to the provided short_url.
       parameters:
         - name: short_url
           in: path
-          description: Short URL generada previamente.
+          description: Previously generated short URL.
           required: true
           schema:
             type: string
       responses:
         '200':
-          description: Información de la URL acortada.
+          description: Information about the shortened URL.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  short_url:
-                    type: string
-                  long_url:
-                    type: string
+                $ref: '#/components/schemas/ShortenedURL'
 
     delete:
-      summary: Eliminar una URL acortada
-      description: Elimina la URL acortada correspondiente al short_url proporcionado.
+      summary: Delete a shortened URL
+      description: Deletes the shortened URL corresponding to the provided short_url.
       parameters:
         - name: short_url
           in: path
-          description: Short URL generada previamente.
+          description: Previously generated short URL.
           required: true
           schema:
             type: string
       responses:
         '204':
-          description: URL acortada eliminada correctamente.
+          description: Shortened URL successfully deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url_key:
+                    type: string
+
+components:
+  schemas:
+    ShortenedURL:
+      type: object
+      properties:
+        target_url:
+          type: string
+          format: uri
+          description: The original long URL that was shortened.
+        is_active:
+          type: boolean
+          description: Indicates if the shortened URL is currently active.
+        clicks:
+          type: integer
+          description: The number of times the shortened URL has been clicked.
+        url_key:
+          type: string
+          description: The unique key associated with the shortened URL.
