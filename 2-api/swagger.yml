@@ -12,6 +12,13 @@ paths:
     get:
       summary: Get all shortened URLs
       description: Retrieves a list of all registered shortened URLs.
+      parameters:
+        - name: target_url
+          in: query
+          description: Filter shortened URLs by target_url.
+          schema:
+            type: string
+            format: uri
       responses:
         '200':
           description: List of shortened URLs.
@@ -54,12 +61,12 @@ paths:
                     type: string
                     description: The unique key associated with the shortened URL.
 
-  /url/{short_url}:
+  /url/{url_key}:
     get:
       summary: Get information about a shortened URL
-      description: Retrieves information about the shortened URL corresponding to the provided short_url.
+      description: Retrieves information about the shortened URL corresponding to the provided url_key.
       parameters:
-        - name: short_url
+        - name: url_key
           in: path
           description: Previously generated short URL.
           required: true
@@ -75,9 +82,9 @@ paths:
 
     delete:
       summary: Delete a shortened URL
-      description: Deletes the shortened URL corresponding to the provided short_url.
+      description: Deletes the shortened URL corresponding to the provided url_key.
       parameters:
-        - name: short_url
+        - name: url_key
           in: path
           description: Previously generated short URL.
           required: true
