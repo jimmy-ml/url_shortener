@@ -1,0 +1,87 @@
+openapi: 3.0.0
+info:
+  version: 1.0.0
+  title: API de acortamiento de URLs
+  description: Documentación de la API de acortamiento de URLs
+
+servers:
+  - url: https://api.jml.lat
+
+paths:
+  /url:
+    get:
+      summary: Obtener todas las URLs acortadas
+      description: Obtiene una lista de todas las URLs acortadas registradas.
+      responses:
+        '200':
+          description: Lista de URLs acortadas.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+    post:
+      summary: Crear una nueva URL acortada
+      description: Crea una nueva URL acortada a partir de una URL larga proporcionada.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                long_url:
+                  type: string
+                  format: uri
+              required:
+                - long_url
+      responses:
+        '201':
+          description: URL acortada creada correctamente.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  short_url:
+                    type: string
+
+  /url/{short_url}:
+    get:
+      summary: Obtener información de una URL acortada
+      description: Obtiene información sobre la URL acortada correspondiente al short_url proporcionado.
+      parameters:
+        - name: short_url
+          in: path
+          description: Short URL generada previamente.
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Información de la URL acortada.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  short_url:
+                    type: string
+                  long_url:
+                    type: string
+
+    delete:
+      summary: Eliminar una URL acortada
+      description: Elimina la URL acortada correspondiente al short_url proporcionado.
+      parameters:
+        - name: short_url
+          in: path
+          description: Short URL generada previamente.
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: URL acortada eliminada correctamente.

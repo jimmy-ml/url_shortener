@@ -4,7 +4,7 @@
 URL Shortener es un proyecto que permite crear y usar URL cortas (me.li/AA11BB).
 
 ## API Docs
-Para una lista de los recursos disponibles y sus endpoint ver [API Doc](swagger.yml).
+Para una lista de los recursos disponibles y sus endpoint ver [API Doc](2-api/swagger.yml).
 
 ## Resumen de la solución
 Este proyecto está diseñado en AWS y utiliza servicios como Lambda, API Gateway, S3, CloudFront, etc. Este repositorio contiene el código fuente y los archivos de soporte para una aplicación serverless implementada en AWS.
