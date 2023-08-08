@@ -6,7 +6,12 @@ terraform {
     }
   }
 
-  # backend "s3" {}
+  backend "s3" {
+    bucket = "meli-mrkt-url-shortener-tfstate"
+    key    = "1-core-tfstate"
+    region = "us-east-1"
+    encrypt = true
+  }
 }
 
 provider "aws" {
