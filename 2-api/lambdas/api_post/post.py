@@ -2,6 +2,7 @@ import json
 import os
 import boto3
 import secrets
+from botocore.exceptions import ClientError
 
 s3_client = boto3.client('s3')
 
@@ -11,15 +12,40 @@ def build_response(code, message):
         'headers': {
             'Content-Type': 'application/json',
         },
-        'body': message
+        'body': json.dumps(message)
     }
 
-def put_url_key_s3(s3_bucket, s3_key, target_url):
-    s3_client.put_object(
-        Bucket=s3_bucket,
-        Key=s3_key,
-        WebsiteRedirectLocation=target_url
+
+def boto_error(exception):
+    print('Error:', exception.response)
+    body = {
+        'code': exception.response['Error']['Code'],
+        'message': exception.response['Error']['Message'],
+    }
+
+    return build_response(
+        int(exception.response['ResponseMetadata']['HTTPStatusCode']), body
     )
+
+
+def put_url_key_s3(s3_bucket, s3_key, target_url):
+    try:
+        response = s3_client.put_object(
+            Bucket=s3_bucket,
+            Key=s3_key,
+            WebsiteRedirectLocation=target_url
+        )
+        response_body = {
+            "target_url": target_url,
+            "url_key": s3_key
+        }
+        print(f"PUT object in S3 {s3_bucket}", response_body)
+        return build_response(
+            response['ResponseMetadata']['HTTPStatusCode'], response_body
+        )
+    except ClientError as e:
+        return boto_error(e)
+
 
 def lambda_handler(event, context):
     """
@@ -41,10 +67,4 @@ def lambda_handler(event, context):
     key = "".join(secrets.choice(chars) for _ in range(6))
 
     # put object in bucket
-    put_url_key_s3(bucket_name, key, body["target_url"])
-
-    response_body = {
-        "target_url": body["target_url"],
-        "url_key": key
-    }
-    return build_response(200, json.dumps(response_body))
+    return put_url_key_s3(bucket_name, key, body["target_url"])

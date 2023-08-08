@@ -22,6 +22,11 @@ Parameters:
     Type: String
     Description: Version to the API
     Default: "1"
+  LogsRetentionDays:
+    Type: Number
+    Description: "The number of days to retain the log events in the specified log group. Possible values are: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365"
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365]
+    Default: 7
   ##############
   #   DOMAIN   #
   ##############
@@ -110,6 +115,12 @@ Resources:
             Path: /url
             Method: GET
 
+  LogsFunctionApiGetAllUrl:
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      LogGroupName: !Sub "/aws/lambda/${FunctionApiGetAllUrl}"
+      RetentionInDays: !Ref LogsRetentionDays
+
   FunctionApiGetUrl:
     Type: AWS::Serverless::Function
     Properties:
@@ -127,6 +138,12 @@ Resources:
             RestApiId: !Ref API
             Path: /url/{url_key}
             Method: GET
+
+  LogsFunctionApiGetUrl:
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      LogGroupName: !Sub "/aws/lambda/${FunctionApiGetUrl}"
+      RetentionInDays: !Ref LogsRetentionDays
 
   FunctionApiPostUrl:
     Type: AWS::Serverless::Function
@@ -146,6 +163,12 @@ Resources:
             Path: /url
             Method: POST
 
+  LogsFunctionApiPostUrl:
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      LogGroupName: !Sub "/aws/lambda/${FunctionApiPostUrl}"
+      RetentionInDays: !Ref LogsRetentionDays
+
   FunctionApiDeleteUrl:
     Type: AWS::Serverless::Function
     Properties:
@@ -164,6 +187,12 @@ Resources:
             Path: /url/{url_key}
             Method: DELETE
 
+  LogsFunctionApiDeleteUrl:
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      LogGroupName: !Sub "/aws/lambda/${FunctionApiDeleteUrl}"
+      RetentionInDays: !Ref LogsRetentionDays
+
   ####################
   #  EVENTS LAMBDAS  #
   ####################
@@ -178,6 +207,12 @@ Resources:
         Variables:
           DYNAMO_TABLE: !Ref DynamoTableShortKeyName
 
+  LogsFunctionEventPutItemDynamo:
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      LogGroupName: !Sub "/aws/lambda/${FunctionEventPutItemDynamo}"
+      RetentionInDays: !Ref LogsRetentionDays
+
   FunctionEventDeleteItemDynamo:
     Type: AWS::Serverless::Function
     Properties:
@@ -189,6 +224,12 @@ Resources:
         Variables:
           DYNAMO_TABLE: !Ref DynamoTableShortKeyName
 
+  LogsFunctionEventDeleteItemDynamo:
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      LogGroupName: !Sub "/aws/lambda/${FunctionEventDeleteItemDynamo}"
+      RetentionInDays: !Ref LogsRetentionDays
+
   FunctionEventCloudfrontLogs:
     Type: AWS::Serverless::Function
     Properties:
@@ -199,6 +240,12 @@ Resources:
       Environment:
         Variables:
           DYNAMO_TABLE: !Ref DynamoTableShortKeyName
+
+  LogsFunctionEventCloudfrontLogs:
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      LogGroupName: !Sub "/aws/lambda/${FunctionEventCloudfrontLogs}"
+      RetentionInDays: !Ref LogsRetentionDays
 
   ##################
   #       IAM      #

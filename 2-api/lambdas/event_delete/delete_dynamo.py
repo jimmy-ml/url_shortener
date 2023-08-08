@@ -5,6 +5,7 @@ import boto3
 dynamo_resource = boto3.resource('dynamodb')
 s3_client = boto3.client('s3')
 
+
 def delete_short_url_dynamo(dynamo_table, key):
     table = dynamo_resource.Table(dynamo_table)
     table.update_item(
@@ -17,11 +18,13 @@ def delete_short_url_dynamo(dynamo_table, key):
         }
     )
 
+
 def get_target_url(bucket_name, object_key):
     return s3_client.get_object(
         Bucket=bucket_name,
         Key=object_key,
     )['WebsiteRedirectLocation']
+
 
 def lambda_handler(event, context):
     """

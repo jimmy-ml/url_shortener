@@ -93,13 +93,13 @@ paths:
       responses:
         '204':
           description: Shortened URL successfully deleted.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  url_key:
-                    type: string
+          # content:
+          #   application/json:
+          #     schema:
+          #       type: object
+          #       properties:
+          #         url_key:
+          #           type: string
 
 components:
   schemas:

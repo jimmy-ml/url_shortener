@@ -4,6 +4,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 from decimal import Decimal
 
+
 def build_response(code, message):
     return {
         'statusCode': code,
@@ -13,11 +14,13 @@ def build_response(code, message):
         'body': message
     }
 
+
 def item_transform(item):
     return { attribute:(int(value) 
             if isinstance(value, Decimal) 
             else value)
             for attribute, value in item.items() }
+
 
 def lambda_handler(event, context):
     """

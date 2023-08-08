@@ -1,7 +1,7 @@
 # Proyecto Meli - URL Shortener
 ![](https://img.shields.io/badge/url_shortener-v0.0.1-green.svg)
 
-URL Shortener es un proyecto que permite crear y usar URL cortas (me.li/AA11BB).
+URL Shortener es un proyecto que permite crear y usar URL cortas (jml.lat/AA11BB).
 
 ## API Docs
 Para una lista de los recursos disponibles y sus endpoint ver [API Doc](2-api/swagger.yml).
@@ -73,11 +73,13 @@ En este sub-proyecto se disponiblizan los siguientes parámetros en AWS System M
 ### 3 - Events
 Se crean S3 notifications para que ciertas funciones lambdas reacciones a ciertos eventos dentro de los Buckets de S3. En detalle:
 
-- Bucket S3 url-shortener
+- Bucket S3 url_short_key
   - Evento `s3:ObjectCreated:Put` notifica a una función Lambda para crear un nuevo registro en la DB.
   - Evento `s3:ObjectRemoved:Delete` notifica a una función Lambda para editar un registro en la DB.
 
-- Bucket S3 url-shortener-logs
+- Bucket S3 url_short_key_cloudfront_logs
   - Evento `s3:ObjectCreated:Put` notifica a una función Lambda para leer el archivo de logs y actualizar los registros en la DB con la cantidad de accesos detectados en las URL cortas.
+
+Los logs de Cloudfront son escritos en el Bucket S3 url_short_key_cloudfront_logs cada 5 minutos aproximadamente, por lo tanto, la actualización de clicks para los registros en DynamoDB se actualiza también cada 5 minutos.
 
 Este proyecto está construido con Terraform, por lo tanto, para desplegar los recursos, simplemente se debe estar ubicado sobre el directorio del proyecto `3-events` y ejecutar `terraform apply`.

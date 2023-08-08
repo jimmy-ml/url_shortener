@@ -9,11 +9,13 @@ from collections import Counter
 dynamo_resource = boto3.resource('dynamodb')
 s3_client = boto3.client('s3')
 
+
 def get_log_file(bucket_name, object_key):
     return s3_client.get_object(
         Bucket=bucket_name,
         Key=object_key,
     )['Body'].read()
+
 
 def update_clicks_short_url_dynamo(table, key, count):
     table.update_item(
@@ -22,6 +24,7 @@ def update_clicks_short_url_dynamo(table, key, count):
         ExpressionAttributeNames={'#clicks': 'clicks'},
         ExpressionAttributeValues={':n': Decimal(count)}
     )
+
 
 def lambda_handler(event, context):
     """
@@ -54,6 +57,7 @@ def lambda_handler(event, context):
 
     # update dynamo items with clicks count
     short_key_count = Counter(logs_clicks_invocations)
+    print("Count clicks:", short_key_count)
 
     for short_key, count in short_key_count.items():
         update_clicks_short_url_dynamo(table, short_key, count)
