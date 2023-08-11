@@ -13,7 +13,7 @@ no_fail_on_empty_changeset = true
 tags = """
   project_name="UrlShortener"
   environment="dev"
-  iac = "terraform"
+  iac = "sam"
   leader = "jimmy.matlag@gmail.com"
   company_name = "meli"
 """
